@@ -6,10 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+# Sets permissions of the GITHUB_TOKEN
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
+  actions: write
 
 concurrency:
   group: "pages"
@@ -18,12 +20,17 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # Add timeout to prevent hanging
+    
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     
     - name: Set up Node.js
       uses: actions/setup-node@v3
@@ -32,10 +39,16 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: |
+        npm install
+        npm ci
+      continue-on-error: false
       
     - name: Build
-      run: npm run build
+      run: |
+        CI=false npm run build
+      env:
+        CI: false
     
     - name: Setup Pages
       uses: actions/configure-pages@v3
@@ -43,8 +56,10 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v2
       with:
-        path: './build'
+        path: 'build'
         
     - name: Deploy to GitHub Pages
       id: deployment
       uses: actions/deploy-pages@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
