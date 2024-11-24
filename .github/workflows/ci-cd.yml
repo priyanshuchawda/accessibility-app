@@ -6,60 +6,58 @@ on:
   pull_request:
     branches: [ main ]
 
-# Sets permissions of the GITHUB_TOKEN
 permissions:
   contents: write
   pages: write
   id-token: write
-  actions: write
 
+# Allow only one concurrent deployment, but do NOT cancel in-progress runs
 concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # Add timeout to prevent hanging
-    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm ci
+        env:
+          CI: true
+
+      - name: Type check
+        run: npx tsc --noEmit
+        
+      - name: Build
+        run: npm run build
+        env:
+          CI: false
+          PUBLIC_URL: "https://priyanshuchawda.github.io/accessibility-app"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: |
-        npm install
-        npm ci
-      continue-on-error: false
-      
-    - name: Build
-      run: |
-        CI=false npm run build
-      env:
-        CI: false
-    
-    - name: Setup Pages
-      uses: actions/configure-pages@v3
-      
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v2
-      with:
-        path: 'build'
-        
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v2
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
